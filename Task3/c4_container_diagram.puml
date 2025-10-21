@@ -1,0 +1,133 @@
+@startuml C4_Container_SmartHome
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_TOP_DOWN()
+LAYOUT_WITH_LEGEND()
+
+title Диаграмма контейнеров C4: PropDevelopment с интеграцией "Умный дом"
+
+Person(owner, "Собственник", "Владелец недвижимости")
+Person(resident, "Житель", "Лицо с предоставленным доступом")
+
+System_Boundary(mobile, "Мобильные приложения") {
+    Container(mobile_app, "Приложение собственника", "iOS/Android, Kotlin/Swift", "Управление ЖКХ и умным домом")
+}
+
+System_Boundary(sales, "Домен: Продажи") {
+    Container(showcase, "Витрина продаж", "Web, React", "Подбор и бронирование недвижимости")
+    Container(client_tour, "client-tour-app", "Java, Spring Boot", "Онлайн-туры по недвижимости")
+    Container(client_tour_db, "tour-db", "PostgreSQL", "База данных туров")
+    Container(client_mart, "client-mart-app", "Java, Spring Boot", "Онлайн-сделки")
+    Container(client_mart_db, "mart-db", "PostgreSQL", "База данных сделок")
+    Container(client_crm, "client-crm-app", "Dynamics CRM", "CRM клиентов")
+    Container(client_crm_db, "crm-db", "MSSQL", "База данных CRM")
+    Container(estate_app, "client-mart-estate-app", "Java, Spring Boot", "Управление недвижимостью")
+}
+
+System_Boundary(housing, "Домен: ЖКУ") {
+    Container(housing_showcase, "Витрина ЖКУ", "Web, Vue.js", "Витрина услуг для собственников")
+    Container(tenant_core, "tenant-core-app", "Kotlin, Spring Boot", "Сервис предоставления услуг собственникам")
+    Container(tenant_core_db, "tenant-core-db", "PostgreSQL", "База данных услуг")
+    Container(tenant_crm, "CRM (tenant)", "Kotlin, Spring Boot", "Управление данными собственников")
+    Container(tenant_crm_db, "crm-tenant-db", "PostgreSQL", "База данных собственников")
+
+    Container(smart_home_integration, "smart-home-integration-service", "Kotlin, Spring Boot", "Сервис интеграции с платформой умного дома", $tags="new")
+    Container(smart_home_db, "smart-home-db", "PostgreSQL", "Кэш данных устройств и прав доступа", $tags="new")
+    Container(event_processor, "event-processor-service", "Kotlin, Spring Boot", "Обработка событий от умных устройств", $tags="new")
+}
+
+System_Boundary(finance, "Домен: Финансы") {
+    Container(accountant, "accountant-service-1", "1C, REST API", "Финансовый учёт")
+    Container(accountant_db, "accountant-db", "PostgreSQL", "База финансовых данных")
+    Container(directory, "Служба каталогов", "LDAP/AD", "Аутентификация и авторизация")
+}
+
+System_Boundary(data, "Домен: Данные") {
+    Container(dwh, "Data Warehouse", "ClickHouse", "Хранилище данных")
+    Container(bi, "BI-система", "Power BI", "Аналитика и отчётность")
+}
+
+System_Boundary(infrastructure, "Инфраструктура") {
+    Container(firewall, "Firewall", "Межсетевой экран", "Защита периметра")
+    Container(api_gateway_internal, "API Gateway", "Kong/Nginx", "Маршрутизация и балансировка", $tags="new")
+    Container(message_broker, "Message Broker", "RabbitMQ/Kafka", "Очередь сообщений", $tags="new")
+}
+
+System_Boundary(partner_platform, "Партнёрская платформа 'Умный дом'") {
+    Container(partner_gateway, "API Gateway партнёра", "API Gateway", "Точка входа для интеграции")
+    Container(biometry_service, "Сервис биометрии", "Python, TensorFlow", "Распознавание лиц")
+    Container(plate_recognition, "Сервис распознавания номеров", "Python, OpenCV", "Распознавание номеров авто")
+    Container(device_management, "Сервис управления устройствами", "Go, gRPC", "Управление домофонами и шлагбаумами")
+    Container(partner_db, "База устройств", "MongoDB", "Данные устройств и доступа")
+}
+
+System_Ext(intercom, "Умный домофон", "Устройство с камерой и биометрией")
+System_Ext(barrier, "Умный шлагбаум", "Устройство с камерой и управлением")
+System_Ext(gov_systems, "Системы госорганов", "API госуслуг для онлайн-сделок")
+
+' Взаимодействие пользователей
+Rel(owner, mobile_app, "Управляет домом", "HTTPS")
+Rel(owner, showcase, "Просматривает витрину", "HTTPS")
+Rel(resident, intercom, "Использует", "Биометрия")
+
+' Мобильное приложение
+Rel(mobile_app, firewall, "Запросы", "HTTPS")
+Rel(firewall, api_gateway_internal, "Проксирует", "HTTPS")
+Rel(api_gateway_internal, tenant_core, "Маршрутизирует", "REST/HTTPS")
+
+' Домен ЖКУ - основной поток
+Rel(tenant_core, tenant_crm, "Проверяет права", "REST")
+Rel(tenant_core, directory, "Аутентификация", "LDAP")
+Rel(tenant_core, smart_home_integration, "Запросы управления умным домом", "REST")
+Rel(tenant_crm, tenant_crm_db, "Читает/пишет", "JDBC")
+Rel(tenant_core, tenant_core_db, "Читает/пишет", "JDBC")
+
+' Интеграция с умным домом - НОВОЕ
+Rel(smart_home_integration, smart_home_db, "Кэширует данные", "JDBC")
+Rel(smart_home_integration, partner_gateway, "Управление доступом", "REST/OAuth 2.0/HTTPS/mTLS", $tags="integration")
+Rel(smart_home_integration, message_broker, "Публикует события", "AMQP")
+Rel(event_processor, message_broker, "Подписывается на события", "AMQP")
+Rel(event_processor, tenant_core, "Уведомляет о событиях", "REST")
+Rel(partner_gateway, smart_home_integration, "Webhook уведомления", "HTTPS/Webhook", $tags="integration")
+
+' Партнёрская платформа - внутреннее взаимодействие
+Rel(partner_gateway, biometry_service, "Обработка биометрии", "gRPC")
+Rel(partner_gateway, plate_recognition, "Распознавание номеров", "gRPC")
+Rel(partner_gateway, device_management, "Управление устройствами", "gRPC")
+Rel(device_management, partner_db, "Читает/пишет", "MongoDB Protocol")
+Rel(biometry_service, partner_db, "Читает биометрию", "MongoDB Protocol")
+Rel(plate_recognition, partner_db, "Читает номера", "MongoDB Protocol")
+
+' Устройства
+Rel(intercom, device_management, "Отправляет видео, получает команды", "MQTT/TLS")
+Rel(barrier, device_management, "Отправляет фото, получает команды", "MQTT/TLS")
+
+' Домен Продажи
+Rel(showcase, client_tour, "Заказ тура", "REST")
+Rel(showcase, client_mart, "Онлайн-сделка", "REST")
+Rel(client_tour, client_tour_db, "Читает/пишет", "JDBC")
+Rel(client_mart, client_mart_db, "Читает/пишет", "JDBC")
+Rel(client_mart, gov_systems, "Интеграция с госорганами", "REST/SOAP/HTTPS")
+Rel(client_crm, client_crm_db, "Читает/пишет", "JDBC")
+
+' Домен Финансы
+Rel(tenant_core, accountant, "Передача платежей ЖКУ", "REST")
+Rel(accountant, accountant_db, "Читает/пишет", "JDBC")
+Rel(accountant, directory, "Аутентификация", "LDAP")
+Rel(client_crm, directory, "Аутентификация", "LDAP")
+Rel(tenant_crm, directory, "Аутентификация", "LDAP")
+
+' Домен Данные
+Rel(tenant_core, dwh, "Отправка данных", "ETL")
+Rel(accountant, dwh, "Отправка данных", "ETL")
+Rel(client_crm, dwh, "Отправка данных", "ETL")
+Rel(smart_home_integration, dwh, "Отправка событий умного дома", "ETL", $tags="new")
+Rel(bi, dwh, "Анализ данных", "SQL")
+
+' Поставщики ЖКХ
+System_Ext(housing_providers, "Поставщики ЖКХ", "API управляющих компаний")
+Rel(tenant_core, housing_providers, "Интеграция с УК", "REST/API")
+
+SHOW_LEGEND()
+
+@enduml

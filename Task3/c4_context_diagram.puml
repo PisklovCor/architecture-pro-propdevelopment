@@ -1,0 +1,55 @@
+@startuml C4_Context_SmartHome
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Диаграмма контекста C4: Интеграция сервисов "Умный дом"
+
+Person(owner, "Собственник", "Владелец недвижимости, управляет доступом через мобильное приложение")
+Person(resident, "Житель/Гость", "Лицо, которому предоставлен доступ собственником")
+Person(admin, "Администратор УК", "Сотрудник управляющей компании")
+
+System_Boundary(propdevelopment, "PropDevelopment") {
+    System(mobile_app, "Мобильное приложение собственника", "iOS/Android приложение для управления ЖКХ и умным домом")
+    System(tenant_core, "tenant-core-app", "Backend-сервис для предоставления услуг собственникам")
+    System(tenant_crm, "CRM (tenant)", "Система управления данными собственников")
+    System(ldap, "Служба каталогов", "LDAP/AD для аутентификации и авторизации")
+}
+
+System_Boundary(partner, "Партнёрская платформа 'Умный дом'") {
+    System(api_gateway, "API Gateway партнёра", "Точка входа для интеграции, управление запросами")
+    System(biometry, "Сервис биометрии", "Распознавание лиц для умного домофона")
+    System(plate_recognition, "Сервис распознавания номеров", "Распознавание автомобильных номеров")
+    System(device_control, "Сервис управления устройствами", "Управление домофонами и шлагбаумами")
+}
+
+System_Ext(intercom, "Умный домофон", "Видеодомофон с функцией биометрии")
+System_Ext(barrier, "Умный шлагбаум", "Автоматический шлагбаум с распознаванием номеров")
+
+' Взаимодействие пользователей с системами
+Rel(owner, mobile_app, "Управляет доступом, просматривает историю", "HTTPS")
+Rel(resident, intercom, "Использует для входа", "Биометрия")
+Rel(resident, barrier, "Въезжает на парковку", "Автомобиль")
+Rel(admin, mobile_app, "Настраивает устройства", "HTTPS")
+
+' Внутренние взаимодействия PropDevelopment
+Rel(mobile_app, tenant_core, "Отправляет запросы на управление доступом", "REST API/HTTPS")
+Rel(tenant_core, tenant_crm, "Проверяет права собственника", "REST API")
+Rel(tenant_core, ldap, "Аутентификация и авторизация", "LDAP")
+
+' Интеграция с партнёрской платформой
+Rel(tenant_core, api_gateway, "Управление доступом, проверка прав", "REST API/OAuth 2.0/HTTPS")
+Rel(api_gateway, biometry, "Обработка биометрических данных", "gRPC/Internal")
+Rel(api_gateway, plate_recognition, "Распознавание номеров", "gRPC/Internal")
+Rel(api_gateway, device_control, "Команды управления устройствами", "gRPC/Internal")
+
+' Взаимодействие устройств с платформой
+Rel(intercom, device_control, "Отправляет видео, получает команды", "MQTT/WSS")
+Rel(barrier, device_control, "Отправляет фото номера, получает команды", "MQTT/WSS")
+
+' Обратные связи
+Rel(device_control, api_gateway, "События и уведомления", "WebSocket/SSE")
+Rel(api_gateway, tenant_core, "Уведомления о событиях", "WebSocket/Webhook")
+Rel(tenant_core, mobile_app, "Push-уведомления", "FCM/APNS")
+
+@enduml
