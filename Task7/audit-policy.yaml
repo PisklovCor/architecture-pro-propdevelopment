@@ -1,0 +1,27 @@
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+- level: Metadata
+  namespaces: ["audit-zone"]
+  resources:
+  - group: ""
+    resources: ["pods"]
+    verbs: ["create", "update", "patch", "delete"]
+- level: RequestResponse
+  namespaces: ["audit-zone"]
+  resources:
+  - group: ""
+    resources: ["pods"]
+    verbs: ["create"]
+    omitStages: ["ResponseStarted"]
+- level: Request
+  namespaces: ["audit-zone"]
+  resources:
+  - group: "admissionregistration.k8s.io"
+    resources: ["validatingwebhookconfigurations", "mutatingwebhookconfigurations"]
+  - group: "config.gatekeeper.sh"
+    resources: ["*"]
+  - group: "templates.gatekeeper.sh"
+    resources: ["*"]
+omitStages:
+- RequestReceived
